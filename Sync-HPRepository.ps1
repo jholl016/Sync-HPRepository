@@ -50,7 +50,7 @@
 	FileName:    Sync-HPRepository.ps1
     Author:      Justin Holloman
 	Created:     2020-03-02
-	Version:     1.0.0
+	Version:     1.0.1
 #>
 
 [CmdletBinding()]
@@ -107,7 +107,7 @@ param (
 #region Initialization
 #Requires -Version 7.0
 $ErrorActionPreference = 'Stop'
-$scriptVersion = "1.0.0"
+$scriptVersion = "1.0.1"
 
 $scriptroot = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $failuresPath = "$scriptroot\failures"
@@ -129,6 +129,7 @@ Get-ChildItem -Path $failuresPath | Remove-Item -Recurse -Force
 # import required modules
 try {
     Import-Module HP.ClientManagement -ErrorAction Stop
+    Import-Module HP.Private -ErrorAction Stop
 }
 catch {
     throw "Failed to import required modules.  Install HP Client Management Script Library and try again."
@@ -224,44 +225,6 @@ function DownloadFile {
             throw "Failed $MaxAttempts times to download $Url"
         }
     }
-}
-
-<#
-    Invoke-HPPrivateExpandCAB from HP.Private module (HP CMSL 1.4.1)
-#>
-function Invoke-HPPrivateExpandCAB {
-    [CmdletBinding()]
-    param(
-      [Parameter(Mandatory = $true)] $cab,
-      [Parameter(Mandatory = $true)] $expectedFile
-    )
-    Write-Verbose "Expanding CAB $cab to $cab.dir"
-  
-    $target = "$cab.dir"
-    Invoke-HPPrivateSafeRemove -Path $target -Recurse
-    Write-Verbose "Expanding $cab to $target"
-    $result = New-Item -Force $target -ItemType Directory
-    Write-Verbose "Created folder $result"
-  
-    $shell = New-Object -ComObject "Shell.Application"
-    try {
-      if (!$?) { $(throw "unable to create $comObject object") }
-  
-      $sourceCab = $shell.Namespace($cab).items()
-      $DestinationFolder = $shell.Namespace($target)
-      $DestinationFolder.CopyHere($sourceCab)
-    }
-    finally {
-      [System.Runtime.InteropServices.Marshal]::ReleaseComObject([System.__ComObject]$shell) | Out-Null
-      [System.GC]::Collect()
-      [System.GC]::WaitForPendingFinalizers()
-  
-    }
-    $downloadedOk = Test-Path $expectedFile
-    if ($downloadedOk -eq $false) {
-      throw "Invalid cab file, did not find $expectedFile in contents"
-    }
-    return $expectedFile
 }
 
 <#
@@ -771,7 +734,7 @@ $existingCVAs.GetEnumerator() | ForEach-Object {
 #region replicate local Softpaq and BIN repos to published locations
 # copy softpaqs to final repo location
 Write-Log -Message "Begin Robocopy repo to $softpaqFinal"
-Start-Process -FilePath "robocopy.exe" -ArgumentList "$softpaqTemp $softpaqFinal /MIR /XD bios" -Wait -ErrorAction Stop
+Start-Process -FilePath "robocopy.exe" -ArgumentList "$softpaqTemp $softpaqFinal /MIR" -Wait -ErrorAction Stop
 Write-Log -Message "Robocopy complete"
 
 # copy bios to final repo location
